@@ -1,1 +1,313 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Jogo 3D</title></head><body><p>Atualização em andamento.</p></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo 3D - Agarrar e Arremessar</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; }
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 1000; color: white;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid #4CAF50; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #ui-overlay {
+            position: absolute; top: 20px; left: 20px; color: white;
+            background: rgba(0, 0, 0, 0.7); padding: 20px;
+            border-radius: 10px; font-size: 14px; pointer-events: none; z-index: 100;
+        }
+        #ui-overlay h2 { margin-bottom: 10px; font-size: 18px; color: #4CAF50; }
+        .control-item { margin: 5px 0; display: flex; align-items: center; gap: 10px; }
+        .key {
+            background: #333; padding: 4px 8px; border-radius: 4px;
+            font-weight: bold; min-width: 30px; text-align: center; border: 1px solid #555;
+        }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 20px; height: 20px; pointer-events: none; z-index: 50;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: rgba(255, 255, 255, 0.8);
+        }
+        #crosshair::before { width: 2px; height: 20px; left: 9px; top: 0; }
+        #crosshair::after { width: 20px; height: 2px; left: 0; top: 9px; }
+        #grab-indicator {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #4CAF50; font-size: 16px; font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 51; display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <div id="loading-text">Carregando...</div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="ui-overlay">
+            <h2>🎮 Controles</h2>
+            <div class="control-item"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span>Mover</span></div>
+            <div class="control-item"><span class="key">Shift</span><span>Correr</span></div>
+            <div class="control-item"><span class="key">Mouse</span><span>Olhar</span></div>
+            <div class="control-item"><span class="key">Clique</span><span>Agarrar/Soltar</span></div>
+            <div class="control-item"><span class="key">R</span><span>Resetar</span></div>
+        </div>
+        <div id="crosshair"></div>
+        <div id="grab-indicator">PEGAR</div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import * as CANNON from 'cannon-es';
+
+        console.log('🎮 Iniciando jogo 3D...');
+
+        const config = {
+            walkSpeed: 5, runSpeed: 10,
+            grabDistance: 4, throwForce: 15,
+            gravity: -9.82
+        };
+
+        let scene, camera, renderer, controls;
+        let world, physicsBodies = [], visualMeshes = [];
+        let heldObject = null, heldBody = null, holdConstraint = null;
+        let raycaster;
+        const keys = { w: false, a: false, s: false, d: false, shift: false };
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        function init() {
+            console.log('📦 Criando cena...');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            console.log('✅ Renderer criado');
+
+            scene.add(new THREE.AmbientLight(0x404040, 0.6));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(50, 50, 50);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.left = -50;
+            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.camera.top = 50;
+            dirLight.shadow.camera.bottom = -50;
+            scene.add(dirLight);
+            console.log('✅ Luzes criadas');
+
+            controls = new PointerLockControls(camera, document.body);
+            document.addEventListener('click', () => {
+                if (!controls.isLocked) controls.lock();
+                else tryGrab();
+            });
+            scene.add(controls.getObject());
+            console.log('✅ Controles criados');
+
+            raycaster = new THREE.Raycaster();
+
+            world = new CANNON.World();
+            world.gravity.set(0, config.gravity, 0);
+            world.broadphase = new CANNON.SAPBroadphase(world);
+            world.allowSleep = true;
+            console.log('✅ Física criada');
+
+            createFloor();
+            createObjects();
+            setupEventListeners();
+
+            document.getElementById('loading-screen').style.display = 'none';
+            console.log('✅ Jogo carregado!');
+
+            animate();
+        }
+
+        function createFloor() {
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(100, 100),
+                new THREE.MeshStandardMaterial({ color: 0x3a5f3a })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const floorBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+            floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+            world.addBody(floorBody);
+        }
+
+        function createObjects() {
+            const geometries = [
+                { type: 'box', geo: new THREE.BoxGeometry(1, 1, 1) },
+                { type: 'sphere', geo: new THREE.SphereGeometry(0.6, 32, 32) },
+                { type: 'cylinder', geo: new THREE.CylinderGeometry(0.5, 0.5, 1.5, 32) }
+            ];
+            const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff];
+
+            for (let i = 0; i < 20; i++) {
+                const item = geometries[Math.floor(Math.random() * geometries.length)];
+                const mesh = new THREE.Mesh(item.geo, new THREE.MeshStandardMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                }));
+                mesh.position.set((Math.random() - 0.5) * 30, 2 + Math.random() * 5, (Math.random() - 0.5) * 30);
+                mesh.castShadow = true;
+                scene.add(mesh);
+                visualMeshes.push(mesh);
+
+                let shape;
+                if (item.type === 'box') shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+                else if (item.type === 'sphere') shape = new CANNON.Sphere(0.6);
+                else shape = new CANNON.Cylinder(0.5, 0.5, 1.5, 32);
+
+                const body = new CANNON.Body({
+                    mass: 1 + Math.random() * 4,
+                    shape: shape,
+                    position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z)
+                });
+                world.addBody(body);
+                physicsBodies.push(body);
+                mesh.userData.physicsBody = body;
+            }
+            console.log('✅ Objetos criados:', visualMeshes.length);
+        }
+
+        function setupEventListeners() {
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'KeyW') keys.w = true;
+                if (e.code === 'KeyA') keys.a = true;
+                if (e.code === 'KeyS') keys.s = true;
+                if (e.code === 'KeyD') keys.d = true;
+                if (e.code === 'ShiftLeft') keys.shift = true;
+                if (e.code === 'KeyR') resetObjects();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.code === 'KeyW') keys.w = false;
+                if (e.code === 'KeyA') keys.a = false;
+                if (e.code === 'KeyS') keys.s = false;
+                if (e.code === 'KeyD') keys.d = false;
+                if (e.code === 'ShiftLeft') keys.shift = false;
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function tryGrab() {
+            if (heldObject) {
+                releaseObject();
+            } else {
+                const rayDir = new THREE.Vector3();
+                camera.getWorldDirection(rayDir);
+                raycaster.set(camera.position, rayDir);
+                raycaster.far = config.grabDistance;
+                const intersects = raycaster.intersectObjects(visualMeshes);
+                if (intersects.length > 0) {
+                    const body = intersects[0].object.userData.physicsBody;
+                    if (body && body.mass > 0) holdObject(intersects[0].object, body);
+                }
+            }
+        }
+
+        function holdObject(mesh, body) {
+            heldObject = mesh;
+            heldBody = body;
+            const holdDir = new THREE.Vector3();
+            camera.getWorldDirection(holdDir);
+            const holdPos = holdDir.multiplyScalar(2.5).add(camera.position);
+            const holdBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(holdPos.x, holdPos.y, holdPos.z) });
+            world.addBody(holdBody);
+            holdConstraint = new CANNON.PointToPointConstraint(body, new CANNON.Vec3(0,0,0), holdBody, new CANNON.Vec3(0,0,0));
+            world.addConstraint(holdConstraint);
+            body.linearDamping = 0.9;
+            document.getElementById('grab-indicator').style.display = 'none';
+        }
+
+        function releaseObject() {
+            if (!heldBody) return;
+            const throwDir = new THREE.Vector3();
+            camera.getWorldDirection(throwDir);
+            throwDir.multiplyScalar(config.throwForce);
+            heldBody.velocity.set(throwDir.x, throwDir.y * 0.5, throwDir.z);
+            world.removeConstraint(holdConstraint);
+            world.removeBody(heldBody);
+            heldObject = null; heldBody = null; holdConstraint = null;
+        }
+
+        function resetObjects() {
+            visualMeshes.forEach((mesh, i) => {
+                mesh.position.set((Math.random() - 0.5) * 30, 2 + Math.random() * 5, (Math.random() - 0.5) * 30);
+                physicsBodies[i].position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+                physicsBodies[i].velocity.set(0, 0, 0);
+            });
+            if (heldObject) releaseObject();
+        }
+
+        function updatePlayer(delta) {
+            if (!controls.isLocked) return;
+            direction.z = Number(keys.w) - Number(keys.s);
+            direction.x = Number(keys.d) - Number(keys.a);
+            direction.normalize();
+            const speed = keys.shift ? config.runSpeed : config.walkSpeed;
+            if (keys.w || keys.s) velocity.z = direction.z * speed * delta;
+            else velocity.z = 0;
+            if (keys.a || keys.d) velocity.x = direction.x * speed * delta;
+            else velocity.x = 0;
+            controls.moveRight(velocity.x);
+            controls.moveForward(velocity.z);
+            if (camera.position.y < 2) camera.position.y = 2;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            world.step(1/60);
+            for (let i = 0; i < physicsBodies.length; i++) {
+                visualMeshes[i].position.copy(physicsBodies[i].position);
+                visualMeshes[i].quaternion.copy(physicsBodies[i].quaternion);
+            }
+            if (heldBody) {
+                const holdDir = new THREE.Vector3();
+                camera.getWorldDirection(holdDir);
+                const holdPos = holdDir.multiplyScalar(2.5).add(camera.position);
+                heldBody.position.set(holdPos.x, holdPos.y, holdPos.z);
+            }
+            updatePlayer(1/60);
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
