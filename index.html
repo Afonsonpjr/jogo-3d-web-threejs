@@ -46,6 +46,44 @@
             color: #4CAF50; font-size: 16px; font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 51; display: none;
         }
+        #guestbook-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: #4CAF50; color: white; border: none;
+            padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+            z-index: 100; transition: transform 0.2s;
+        }
+        #guestbook-btn:hover { transform: scale(1.05); }
+        #guestbook-modal {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.8);
+            z-index: 200; justify-content: center; align-items: center;
+        }
+        #guestbook-modal.active { display: flex; }
+        .guestbook-content {
+            background: #1a1a2e; color: white; padding: 30px;
+            border-radius: 15px; max-width: 500px; width: 90%;
+            max-height: 80vh; overflow-y: auto;
+        }
+        .guestbook-content h2 { color: #4CAF50; margin-bottom: 15px; }
+        .guestbook-content input, .guestbook-content textarea {
+            width: 100%; padding: 10px; margin: 10px 0;
+            background: #16213e; border: 1px solid #333;
+            color: white; border-radius: 5px; font-family: inherit;
+        }
+        .guestbook-content button {
+            background: #4CAF50; color: white; border: none;
+            padding: 10px 20px; border-radius: 5px;
+            cursor: pointer; font-weight: bold; margin-top: 10px;
+        }
+        .guestbook-content button:hover { background: #45a049; }
+        .guestbook-entry {
+            background: #16213e; padding: 15px; margin: 10px 0;
+            border-radius: 8px; border-left: 3px solid #4CAF50;
+        }
+        .guestbook-entry .name { font-weight: bold; color: #4CAF50; }
+        .guestbook-entry .date { font-size: 12px; color: #888; margin-top: 5px; }
+        .close-btn { background: #ff4444; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -63,8 +101,21 @@
             <div class="control-item"><span class="key">Clique</span><span>Agarrar/Soltar</span></div>
             <div class="control-item"><span class="key">R</span><span>Resetar</span></div>
         </div>
+        <button id="guestbook-btn">📝 Guest Book</button>
         <div id="crosshair"></div>
         <div id="grab-indicator">PEGAR</div>
+    </div>
+
+    <div id="guestbook-modal">
+        <div class="guestbook-content">
+            <h2>📝 Guest Book</h2>
+            <p style="margin-bottom: 15px; color: #aaa;">Deixe sua mensagem!</p>
+            <input type="text" id="guest-name" placeholder="Seu nome (opcional)" maxlength="50">
+            <textarea id="guest-message" placeholder="Sua mensagem..." rows="3" maxlength="200"></textarea>
+            <button onclick="addGuestbookEntry()">Enviar</button>
+            <button class="close-btn" onclick="toggleGuestbook()">Fechar</button>
+            <div id="guestbook-entries" style="margin-top: 20px;"></div>
+        </div>
     </div>
 
     <script type="importmap">
@@ -82,38 +133,23 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import * as CANNON from 'cannon-es';
 
-        console.log('🎮 Iniciando jogo 3D...');
-
-        const config = {
-            walkSpeed: 5, runSpeed: 10,
-            grabDistance: 4, throwForce: 15,
-            gravity: -9.82
-        };
-
-        let scene, camera, renderer, controls;
-        let world, physicsBodies = [], visualMeshes = [];
-        let heldObject = null, heldBody = null, holdConstraint = null;
-        let raycaster;
+        const config = { walkSpeed: 5, runSpeed: 10, grabDistance: 4, throwForce: 15, gravity: -9.82 };
+        let scene, camera, renderer, controls, world, physicsBodies = [], visualMeshes = [];
+        let heldObject = null, heldBody = null, holdConstraint = null, raycaster;
         const keys = { w: false, a: false, s: false, d: false, shift: false };
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+        window.guestbookData = [];
 
         function init() {
-            console.log('📦 Criando cena...');
-            
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
             scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
-
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 2, 0);
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
-            console.log('✅ Renderer criado');
-
             scene.add(new THREE.AmbientLight(0x404040, 0.6));
             const dirLight = new THREE.DirectionalLight(0xffffff, 1);
             dirLight.position.set(50, 50, 50);
@@ -123,46 +159,24 @@
             dirLight.shadow.camera.top = 50;
             dirLight.shadow.camera.bottom = -50;
             scene.add(dirLight);
-            console.log('✅ Luzes criadas');
-
             controls = new PointerLockControls(camera, document.body);
-            document.addEventListener('click', () => {
-                if (!controls.isLocked) controls.lock();
-                else tryGrab();
-            });
+            document.addEventListener('click', () => { if (!controls.isLocked) controls.lock(); else tryGrab(); });
             scene.add(controls.getObject());
-            console.log('✅ Controles criados');
-
             raycaster = new THREE.Raycaster();
-
             world = new CANNON.World();
             world.gravity.set(0, config.gravity, 0);
             world.broadphase = new CANNON.SAPBroadphase(world);
             world.allowSleep = true;
-            console.log('✅ Física criada');
-
-            createFloor();
-            createObjects();
-            setupEventListeners();
-
+            createFloor(); createObjects(); setupEventListeners(); loadGuestbook();
             document.getElementById('loading-screen').style.display = 'none';
-            console.log('✅ Jogo carregado!');
-
             animate();
         }
 
         function createFloor() {
-            const floor = new THREE.Mesh(
-                new THREE.PlaneGeometry(100, 100),
-                new THREE.MeshStandardMaterial({ color: 0x3a5f3a })
-            );
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x3a5f3a }));
+            floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
             const floorBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
-            floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-            world.addBody(floorBody);
+            floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0); world.addBody(floorBody);
         }
 
         function createObjects() {
@@ -172,67 +186,62 @@
                 { type: 'cylinder', geo: new THREE.CylinderGeometry(0.5, 0.5, 1.5, 32) }
             ];
             const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff];
-
             for (let i = 0; i < 20; i++) {
                 const item = geometries[Math.floor(Math.random() * geometries.length)];
-                const mesh = new THREE.Mesh(item.geo, new THREE.MeshStandardMaterial({ 
-                    color: colors[Math.floor(Math.random() * colors.length)]
-                }));
+                const mesh = new THREE.Mesh(item.geo, new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)] }));
                 mesh.position.set((Math.random() - 0.5) * 30, 2 + Math.random() * 5, (Math.random() - 0.5) * 30);
-                mesh.castShadow = true;
-                scene.add(mesh);
-                visualMeshes.push(mesh);
-
-                let shape;
-                if (item.type === 'box') shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-                else if (item.type === 'sphere') shape = new CANNON.Sphere(0.6);
-                else shape = new CANNON.Cylinder(0.5, 0.5, 1.5, 32);
-
-                const body = new CANNON.Body({
-                    mass: 1 + Math.random() * 4,
-                    shape: shape,
-                    position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z)
-                });
-                world.addBody(body);
-                physicsBodies.push(body);
-                mesh.userData.physicsBody = body;
+                mesh.castShadow = true; scene.add(mesh); visualMeshes.push(mesh);
+                let shape = item.type === 'box' ? new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)) : item.type === 'sphere' ? new CANNON.Sphere(0.6) : new CANNON.Cylinder(0.5, 0.5, 1.5, 32);
+                const body = new CANNON.Body({ mass: 1 + Math.random() * 4, shape: shape, position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z) });
+                world.addBody(body); physicsBodies.push(body); mesh.userData.physicsBody = body;
             }
-            console.log('✅ Objetos criados:', visualMeshes.length);
         }
 
         function setupEventListeners() {
             document.addEventListener('keydown', (e) => {
-                if (e.code === 'KeyW') keys.w = true;
-                if (e.code === 'KeyA') keys.a = true;
-                if (e.code === 'KeyS') keys.s = true;
-                if (e.code === 'KeyD') keys.d = true;
-                if (e.code === 'ShiftLeft') keys.shift = true;
-                if (e.code === 'KeyR') resetObjects();
+                if (e.code === 'KeyW') keys.w = true; if (e.code === 'KeyA') keys.a = true;
+                if (e.code === 'KeyS') keys.s = true; if (e.code === 'KeyD') keys.d = true;
+                if (e.code === 'ShiftLeft') keys.shift = true; if (e.code === 'KeyR') resetObjects();
             });
-
             document.addEventListener('keyup', (e) => {
-                if (e.code === 'KeyW') keys.w = false;
-                if (e.code === 'KeyA') keys.a = false;
-                if (e.code === 'KeyS') keys.s = false;
-                if (e.code === 'KeyD') keys.d = false;
+                if (e.code === 'KeyW') keys.w = false; if (e.code === 'KeyA') keys.a = false;
+                if (e.code === 'KeyS') keys.s = false; if (e.code === 'KeyD') keys.d = false;
                 if (e.code === 'ShiftLeft') keys.shift = false;
             });
-
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
             });
+            document.getElementById('guestbook-btn').addEventListener('click', toggleGuestbook);
         }
 
+        function toggleGuestbook() { document.getElementById('guestbook-modal').classList.toggle('active'); }
+        function loadGuestbook() {
+            const saved = localStorage.getItem('guestbook');
+            window.guestbookData = saved ? JSON.parse(saved) : [{ name: 'Dev', message: 'Bem-vindo! 🎮', date: new Date().toLocaleString('pt-BR') }];
+            saveGuestbook(); renderGuestbook();
+        }
+        function saveGuestbook() { localStorage.setItem('guestbook', JSON.stringify(window.guestbookData)); }
+        window.addGuestbookEntry = function() {
+            const nameInput = document.getElementById('guest-name'), messageInput = document.getElementById('guest-message');
+            const name = nameInput.value.trim() || 'Anonimo', message = messageInput.value.trim();
+            if (!message) { alert('Escreva uma mensagem!'); return; }
+            window.guestbookData.unshift({ name, message, date: new Date().toLocaleString('pt-BR') });
+            if (window.guestbookData.length > 50) window.guestbookData = window.guestbookData.slice(0, 50);
+            saveGuestbook(); renderGuestbook(); nameInput.value = ''; messageInput.value = '';
+        };
+        function renderGuestbook() {
+            document.getElementById('guestbook-entries').innerHTML = window.guestbookData.map(e =>
+                '<div class="guestbook-entry"><div class="name">' + escapeHtml(e.name) + '</div><div>' + escapeHtml(e.message) + '</div><div class="date">' + e.date + '</div></div>'
+            ).join('');
+        }
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
         function tryGrab() {
-            if (heldObject) {
-                releaseObject();
-            } else {
-                const rayDir = new THREE.Vector3();
-                camera.getWorldDirection(rayDir);
-                raycaster.set(camera.position, rayDir);
-                raycaster.far = config.grabDistance;
+            if (heldObject) releaseObject();
+            else {
+                const rayDir = new THREE.Vector3(); camera.getWorldDirection(rayDir);
+                raycaster.set(camera.position, rayDir); raycaster.far = config.grabDistance;
                 const intersects = raycaster.intersectObjects(visualMeshes);
                 if (intersects.length > 0) {
                     const body = intersects[0].object.userData.physicsBody;
@@ -240,32 +249,23 @@
                 }
             }
         }
-
         function holdObject(mesh, body) {
-            heldObject = mesh;
-            heldBody = body;
-            const holdDir = new THREE.Vector3();
-            camera.getWorldDirection(holdDir);
+            heldObject = mesh; heldBody = body;
+            const holdDir = new THREE.Vector3(); camera.getWorldDirection(holdDir);
             const holdPos = holdDir.multiplyScalar(2.5).add(camera.position);
             const holdBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(holdPos.x, holdPos.y, holdPos.z) });
             world.addBody(holdBody);
             holdConstraint = new CANNON.PointToPointConstraint(body, new CANNON.Vec3(0,0,0), holdBody, new CANNON.Vec3(0,0,0));
-            world.addConstraint(holdConstraint);
-            body.linearDamping = 0.9;
+            world.addConstraint(holdConstraint); body.linearDamping = 0.9;
             document.getElementById('grab-indicator').style.display = 'none';
         }
-
         function releaseObject() {
             if (!heldBody) return;
-            const throwDir = new THREE.Vector3();
-            camera.getWorldDirection(throwDir);
-            throwDir.multiplyScalar(config.throwForce);
+            const throwDir = new THREE.Vector3(); camera.getWorldDirection(throwDir); throwDir.multiplyScalar(config.throwForce);
             heldBody.velocity.set(throwDir.x, throwDir.y * 0.5, throwDir.z);
-            world.removeConstraint(holdConstraint);
-            world.removeBody(heldBody);
+            world.removeConstraint(holdConstraint); world.removeBody(heldBody);
             heldObject = null; heldBody = null; holdConstraint = null;
         }
-
         function resetObjects() {
             visualMeshes.forEach((mesh, i) => {
                 mesh.position.set((Math.random() - 0.5) * 30, 2 + Math.random() * 5, (Math.random() - 0.5) * 30);
@@ -274,39 +274,28 @@
             });
             if (heldObject) releaseObject();
         }
-
         function updatePlayer(delta) {
             if (!controls.isLocked) return;
-            direction.z = Number(keys.w) - Number(keys.s);
-            direction.x = Number(keys.d) - Number(keys.a);
-            direction.normalize();
+            direction.z = Number(keys.w) - Number(keys.s); direction.x = Number(keys.d) - Number(keys.a); direction.normalize();
             const speed = keys.shift ? config.runSpeed : config.walkSpeed;
-            if (keys.w || keys.s) velocity.z = direction.z * speed * delta;
-            else velocity.z = 0;
-            if (keys.a || keys.d) velocity.x = direction.x * speed * delta;
-            else velocity.x = 0;
-            controls.moveRight(velocity.x);
-            controls.moveForward(velocity.z);
+            velocity.z = (keys.w || keys.s) ? direction.z * speed * delta : 0;
+            velocity.x = (keys.a || keys.d) ? direction.x * speed * delta : 0;
+            controls.moveRight(velocity.x); controls.moveForward(velocity.z);
             if (camera.position.y < 2) camera.position.y = 2;
         }
-
         function animate() {
-            requestAnimationFrame(animate);
-            world.step(1/60);
+            requestAnimationFrame(animate); world.step(1/60);
             for (let i = 0; i < physicsBodies.length; i++) {
                 visualMeshes[i].position.copy(physicsBodies[i].position);
                 visualMeshes[i].quaternion.copy(physicsBodies[i].quaternion);
             }
             if (heldBody) {
-                const holdDir = new THREE.Vector3();
-                camera.getWorldDirection(holdDir);
+                const holdDir = new THREE.Vector3(); camera.getWorldDirection(holdDir);
                 const holdPos = holdDir.multiplyScalar(2.5).add(camera.position);
                 heldBody.position.set(holdPos.x, holdPos.y, holdPos.z);
             }
-            updatePlayer(1/60);
-            renderer.render(scene, camera);
+            updatePlayer(1/60); renderer.render(scene, camera);
         }
-
         window.addEventListener('load', init);
     </script>
 </body>
