@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jogo 3D - Agarrar e Arremessar</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
@@ -140,15 +141,15 @@
 
         function createObjects() {
             const geometries = [
-                new THREE.BoxGeometry(1, 1, 1),
-                new THREE.SphereGeometry(0.6, 32, 32),
-                new THREE.CylinderGeometry(0.5, 0.5, 1.5, 32),
-                new THREE.ConeGeometry(0.6, 1.5, 32)
+                { type: 'box', geo: new THREE.BoxGeometry(1, 1, 1) },
+                { type: 'sphere', geo: new THREE.SphereGeometry(0.6, 32, 32) },
+                { type: 'cylinder', geo: new THREE.CylinderGeometry(0.5, 0.5, 1.5, 32) }
             ];
             const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff];
 
             for (let i = 0; i < 20; i++) {
-                const geo = geometries[Math.floor(Math.random() * geometries.length)];
+                const item = geometries[Math.floor(Math.random() * geometries.length)];
+                const geo = item.geo;
                 const mat = new THREE.MeshStandardMaterial({ 
                     color: colors[Math.floor(Math.random() * colors.length)],
                     roughness: 0.5, metalness: 0.3
@@ -166,10 +167,13 @@
                 visualMeshes.push(mesh);
 
                 let shape;
-                if (geo.type === 'BoxGeometry') shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-                else if (geo.type === 'SphereGeometry') shape = new CANNON.Sphere(0.6);
-                else if (geo.type === 'CylinderGeometry') shape = new CANNON.Cylinder(0.5, 0.5, 1.5, 32);
-                else shape = new CANNON.Cone(0.6, 1.5, 32);
+                if (item.type === 'box') {
+                    shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+                } else if (item.type === 'sphere') {
+                    shape = new CANNON.Sphere(0.6);
+                } else if (item.type === 'cylinder') {
+                    shape = new CANNON.Cylinder(0.5, 0.5, 1.5, 32);
+                }
 
                 const body = new CANNON.Body({
                     mass: 1 + Math.random() * 4,
