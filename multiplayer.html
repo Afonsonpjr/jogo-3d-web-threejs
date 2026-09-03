@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Guest</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e); }
+        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .lobby-content { background: rgba(0,0,0,0.8); padding: 40px; border-radius: 20px; text-align: center; color: white; max-width: 500px; width: 90%; }
+        .lobby-content h1 { color: #4CAF50; margin-bottom: 10px; font-size: 32px; }
+        .lobby-content p { color: #aaa; margin-bottom: 30px; }
+        input { width: 100%; padding: 15px; margin: 10px 0; background: #16213e; border: 2px solid #333; color: white; border-radius: 10px; font-size: 16px; }
+        input:focus { outline: none; border-color: #4CAF50; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin: 10px 5px; transition: transform 0.2s; }
+        .btn:hover { transform: scale(1.05); }
+        .btn:disabled { background: #666; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #ff4444; }
+        #players-list { margin-top: 30px; text-align: left; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; }
+        #players-list h3 { color: #4CAF50; margin-bottom: 15px; }
+        .player-item { background: rgba(76,175,80,0.2); padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #4CAF50; }
+        .player-item .name { font-weight: bold; }
+        .player-item .id { font-size: 12px; color: #aaa; }
+        #connection-status { margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .connected { background: rgba(76,175,80,0.3); color: #4CAF50; }
+        .disconnected { background: rgba(255,68,68,0.3); color: #ff4444; }
+        #game-container { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #back-btn { position: absolute; top: 20px; left: 20px; background: #ff4444; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="lobby">
+        <div class="lobby-content">
+            <h1>🌐 Multiplayer Guest</h1>
+            <p>Jogue online sem login! ID &uacute;nico gerado automaticamente.</p>
+            <input type="text" id="player-name" placeholder="Seu nome (opcional)" maxlength="30">
+            <button id="join-btn" class="btn">Entrar na Sala</button>
+            <button onclick="window.location.href='index.html'" class="btn btn-secondary">Voltar</button>
+            <div id="connection-status" class="disconnected">Desconectado</div>
+            <div id="players-list" style="display: none;">
+                <h3>👥 Jogadores Online</h3>
+                <div id="players"></div>
+            </div>
+        </div>
+    </div>
+    <div id="game-container">
+        <button id="back-btn" onclick="location.reload()">&larr; Sair</button>
+        <div id="canvas-container" style="width: 100%; height: 100%;"></div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/","cannon-es":"https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"}}</script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import * as CANNON from 'cannon-es';
+        const guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('guestId', guestId);
+        console.log('🆔 Seu ID:', guestId);
+        const socket = io('https://seu-servidor.herokuapp.com', { autoConnect: false });
+        let playerName = '', connected = false, players = {};
+        const lobbyEl = document.getElementById('lobby'), gameContainerEl = document.getElementById('game-container');
+        const joinBtn = document.getElementById('join-btn'), nameInput = document.getElementById('player-name');
+        const statusEl = document.getElementById('connection-status'), playersListEl = document.getElementById('players-list'), playersEl = document.getElementById('players');
+        let scene, camera, renderer, controls, world, playerBody, otherPlayers = {};
+        const PHYSICS = { gravity: -9.82, playerMass: 70, playerHeight: 1.8, walkSpeed: 5, runSpeed: 10 };
+        const keys = { w: false, a: false, s: false, d: false, shift: false };
+        socket.on('connect', () => { connected = true; statusEl.textContent = '✅ Conectado!'; statusEl.className = 'connected'; joinBtn.disabled = false; console.log('🔌 Conectado'); });
+        socket.on('disconnect', () => { connected = false; statusEl.textContent = '❌ Desconectado'; statusEl.className = 'disconnected'; console.log('🔌 Desconectado'); });
+        socket.on('playerList', (playerList) => { players = playerList; renderPlayerList(); });
+        socket.on('playerJoined', (data) => { console.log('👥 Jogador entrou:', data.name); createOtherPlayer(data); });
+        socket.on('playerLeft', (id) => { console.log('👤 Jogador saiu:', id); removeOtherPlayer(id); });
+        socket.on('playerMove', (data) => { updateOtherPlayer(data); });
+        function renderPlayerList() { playersEl.innerHTML = Object.values(players).map(p => '<div class="player-item"><div class="name">' + (p.name || 'Anonimo') + '</div><div class="id">' + p.id + '</div></div>').join(''); playersListEl.style.display = 'block'; }
+        function createOtherPlayer(data) { if (otherPlayers[data.id]) return; const geometry = new THREE.BoxGeometry(1, 2, 1); const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff }); const mesh = new THREE.Mesh(geometry, material); mesh.position.set(data.x || 0, data.y || 2, data.z || 0); scene.add(mesh); otherPlayers[data.id] = mesh; }
+        function updateOtherPlayer(data) { if (!otherPlayers[data.id]) return; otherPlayers[data.id].position.set(data.x, data.y, data.z); }
+        function removeOtherPlayer(id) { if (otherPlayers[id]) { scene.remove(otherPlayers[id]); delete otherPlayers[id]; } }
+        function joinGame() { playerName = nameInput.value.trim() || 'Anonimo_' + guestId.substr(-4); socket.emit('join', { id: guestId, name: playerName, x: 0, y: 2, z: 0 }); lobbyEl.style.display = 'none'; gameContainerEl.style.display = 'block'; initGame(); }
+        function initGame() { scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB); camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000); camera.position.set(0, PHYSICS.playerHeight, 0); renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight); document.getElementById('canvas-container').appendChild(renderer.domElement); const light = new THREE.DirectionalLight(0xffffff, 1); light.position.set(50, 50, 50); scene.add(light); scene.add(new THREE.AmbientLight(0x404040, 0.6)); controls = new PointerLockControls(camera, document.body); controls.lock(); scene.add(controls.getObject()); world = new CANNON.World(); world.gravity.set(0, PHYSICS.gravity, 0); world.broadphase = new CANNON.SAPBroadphase(world); const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x3a5f3a })); floor.rotation.x = -Math.PI / 2; scene.add(floor); const floorBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() }); floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0); world.addBody(floorBody); const playerShape = new CANNON.Cylinder(0.5, 0.5, PHYSICS.playerHeight, 8); playerBody = new CANNON.Body({ mass: PHYSICS.playerMass, position: new CANNON.Vec3(0, PHYSICS.playerHeight, 0), shape: playerShape, linearDamping: 0.9, fixedRotation: true }); world.addBody(playerBody); setupEventListeners(); animate(); }
+        function setupEventListeners() { document.addEventListener('keydown', (e) => { if (e.code === 'KeyW') keys.w = true; if (e.code === 'KeyA') keys.a = true; if (e.code === 'KeyS') keys.s = true; if (e.code === 'KeyD') keys.d = true; if (e.code === 'ShiftLeft') keys.shift = true; }); document.addEventListener('keyup', (e) => { if (e.code === 'KeyW') keys.w = false; if (e.code === 'KeyA') keys.a = false; if (e.code === 'KeyS') keys.s = false; if (e.code === 'KeyD') keys.d = false; if (e.code === 'ShiftLeft') keys.shift = false; }); window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }); }
+        function updatePlayerMovement() { if (!playerBody || !controls.isLocked) return; const direction = new THREE.Vector3(); direction.z = Number(keys.w) - Number(keys.s); direction.x = Number(keys.d) - Number(keys.a); direction.normalize(); const speed = keys.shift ? PHYSICS.runSpeed : PHYSICS.walkSpeed; const cameraDirection = new THREE.Vector3(); camera.getWorldDirection(cameraDirection); cameraDirection.y = 0; cameraDirection.normalize(); const targetVelocity = new CANNON.Vec3(0, playerBody.velocity.y, 0); if (keys.w || keys.s) { targetVelocity.x += cameraDirection.x * direction.z * speed; targetVelocity.z += cameraDirection.z * direction.z * speed; } if (keys.a || keys.d) { const cameraRight = new THREE.Vector3(); cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0)); targetVelocity.x += cameraRight.x * direction.x * speed; targetVelocity.z += cameraRight.z * direction.x * speed; } playerBody.velocity.x = targetVelocity.x; playerBody.velocity.z = targetVelocity.z; camera.position.copy(playerBody.position); camera.position.y += PHYSICS.playerHeight / 2; if (connected) { socket.emit('playerMove', { id: guestId, x: playerBody.position.x, y: playerBody.position.y, z: playerBody.position.z }); } }
+        function animate() { requestAnimationFrame(animate); world.step(1/60); updatePlayerMovement(); renderer.render(scene, camera); }
+        socket.connect();
+        joinBtn.addEventListener('click', joinGame);
+    </script>
+</body>
+</html>
