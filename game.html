@@ -2,119 +2,67 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>Jogo 3D - Arena</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; touch-action: none; }
     body { margin: 0; overflow: hidden; font-family: system-ui, sans-serif; background: #101827; color: #fff; }
     canvas { display: block; }
     #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
-    #topbar { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; }
-    .panel { background: rgba(8, 15, 30, .78); border: 1px solid rgba(255,255,255,.16); border-radius: 12px; padding: 12px 14px; backdrop-filter: blur(8px); }
-    #health { width: 220px; height: 16px; background: #40242b; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    #topbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; }
+    .panel { background: rgba(8, 15, 30, .78); border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(8px); font-size: 13px; }
+    #health { width: 180px; height: 14px; background: #40242b; border-radius: 999px; overflow: hidden; margin-top: 6px; }
     #healthFill { width: 100%; height: 100%; background: linear-gradient(90deg,#e93d52,#ff7d69); }
-    #status { position: absolute; left: 50%; top: 76px; transform: translateX(-50%); text-align: center; }
-    #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%,-50%); }
+    #status { position: absolute; left: 50%; top: 60px; transform: translateX(-50%); text-align: center; font-size: 12px; }
+    #crosshair { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; transform: translate(-50%,-50%); }
     #crosshair:before,#crosshair:after { content: ''; position: absolute; background: white; opacity: .9; }
-    #crosshair:before { width: 2px; height: 18px; left: 8px; } #crosshair:after { height: 2px; width: 18px; top: 8px; }
-    #help { position: absolute; bottom: 16px; left: 16px; line-height: 1.55; }
+    #crosshair:before { width: 2px; height: 16px; left: 7px; } #crosshair:after { height: 2px; width: 16px; top: 7px; }
+    #help { position: absolute; bottom: 10px; left: 10px; line-height: 1.4; font-size: 11px; }
     #menu { pointer-events: auto; color: #fff; text-decoration: none; }
     #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; background: #101827; }
-    #loading .box { text-align:center; padding:28px; border-radius:16px; background:#17223a; }
-    .spinner { width:42px;height:42px;border:4px solid #344466;border-top-color:#55d985;border-radius:50%;margin:0 auto 14px;animation:spin 1s linear infinite; }
+    #loading .box { text-align:center; padding:24px; border-radius:14px; background:#17223a; }
+    .spinner { width:38px;height:38px;border:4px solid #344466;border-top-color:#55d985;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    #mobileControls { position: fixed; inset: 0; pointer-events: none; z-index: 3; display: none; }
+    #joystickZone { position: absolute; bottom: 80px; left: 40px; width: 140px; height: 140px; pointer-events: auto; }
+    #joystickBase { width: 100%; height: 100%; background: rgba(255,255,255,0.15); border-radius: 50%; position: relative; }
+    #joystickStick { width: 50px; height: 50px; background: rgba(85,217,133,0.8); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+    #actionButtons { position: absolute; bottom: 80px; right: 40px; display: flex; gap: 15px; pointer-events: auto; }
+    .actionBtn { width: 65px; height: 65px; background: rgba(85,217,133,0.7); border-radius: 50%; border: none; color: white; font-size: 24px; font-weight: bold; }
+    .actionBtn:active { background: rgba(85,217,133,1); transform: scale(0.95); }
+    #jumpBtn { background: rgba(76,175,80,0.7); }
+    #grabBtn { background: rgba(33,150,243,0.7); }
+    #uploadBtn { position: absolute; bottom: 20px; right: 10px; pointer-events: auto; background: rgba(156,39,176,0.7); width: 50px; height: 50px; border-radius: 50%; border: none; color: white; font-size: 20px; }
+    #voiceIndicator { position: absolute; top: 60px; right: 10px; background: rgba(255,87,34,0.8); padding: 8px 12px; border-radius: 20px; font-size: 12px; display: none; }
+    @media (max-width: 768px) { #mobileControls { display: block; } #help { display: none; } .panel { font-size: 11px; padding: 8px 10px; } }
   </style>
 </head>
 <body>
-  <div id="loading"><div class="box"><div class="spinner"></div><strong id="loadingText">Preparando arena...</strong><div id="loadingHint" style="margin-top:8px;color:#a9b5cd;font-size:14px">Carregando modelo de exemplo</div></div></div>
+  <div id="loading"><div class="box"><div class="spinner"></div><strong id="loadingText">Preparando arena...</strong><div id="loadingHint" style="margin-top:8px;color:#a9b5cd;font-size:13px">Carregando...</div></div></div>
   <div id="overlay">
     <div id="topbar"><div class="panel"><strong>ARENA 3D</strong><div id="health"><div id="healthFill"></div></div><small>Vida: 100 HP</small></div><a class="panel" id="menu" href="index.html">← Menu</a></div>
-    <div id="status" class="panel">Clique na cena para travar o mouse. WASD move, Shift corre, Espaço pula, clique pega/solta.</div>
-    <div id="crosshair"></div>
-    <div id="help" class="panel">Objetos: <span id="objectCount">0</span><br>Modelo: <span id="modelStatus">carregando…</span></div>
+    <div id="status" class="panel">Clique/toque para jogar. WASD move, Shift corre, Espaço pula, segure V para falar</div>
+    <div id="crosshair"></div><div id="help" class="panel">Objetos: <span id="objectCount">0</span><br>Modelo: <span id="modelStatus">carregando…</span></div><div id="voiceIndicator">🎤 Falando...</div>
   </div>
+  <div id="mobileControls"><div id="joystickZone"><div id="joystickBase"><div id="joystickStick"></div></div></div><div id="actionButtons"><button id="jumpBtn" class="actionBtn">⬆</button><button id="grabBtn" class="actionBtn">✋</button></div><button id="uploadBtn">📤</button></div>
+  <input type="file" id="fileInput" accept=".glb,.gltf" style="display:none" />
   <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/","cannon-es":"https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"}}</script>
   <script type="module">
-    import * as THREE from 'three';
-    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import * as CANNON from 'cannon-es';
-
-    const config = { walk: 5, run: 9, jump: 5.5, grabDistance: 4, throwForce: 13, playerHeight: 1.8 };
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x8bc9ef);
-    scene.fog = new THREE.Fog(0x8bc9ef, 28, 95);
-    const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, .1, 200);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
-    const controls = new PointerLockControls(camera, document.body);
-    scene.add(controls.getObject());
-    const world = new CANNON.World(); world.gravity.set(0, -9.82, 0); world.broadphase = new CANNON.SAPBroadphase(world);
-    const clock = new THREE.Clock();
-    const raycaster = new THREE.Raycaster();
-    const keys = new Set(); const bodies = []; const interactables = [];
-    let playerBody, grounded = false, held = null, heldAnchor = null, heldConstraint = null;
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x48654b, 2.2));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.5); sun.position.set(20, 30, 15); sun.castShadow = true; scene.add(sun);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100,100), new THREE.MeshStandardMaterial({ color: 0x3f7844, roughness: .95 })); floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
-    const floorBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() }); floorBody.quaternion.setFromEuler(-Math.PI/2,0,0); world.addBody(floorBody);
-    const grid = new THREE.GridHelper(100, 50, 0x4e9657, 0x356b3d); grid.position.y=.01; scene.add(grid);
-
-    function createPlayer() {
-      playerBody = new CANNON.Body({ mass: 70, shape: new CANNON.Sphere(.5), position: new CANNON.Vec3(0, 1.4, 8), linearDamping: .85, fixedRotation: true });
-      playerBody.addEventListener('collide', e => { if (e.contact.ni.y < -.45 || e.contact.ni.y > .45) grounded = true; });
-      world.addBody(playerBody);
-    }
-    function addPrimitive(type, position, color) {
-      let geometry, shape;
-      if(type==='sphere'){ geometry=new THREE.SphereGeometry(.45,20,14); shape=new CANNON.Sphere(.45); }
-      else if(type==='cylinder'){ geometry=new THREE.CylinderGeometry(.4,.4,1.1,16); shape=new CANNON.Cylinder(.4,.4,1.1,16); }
-      else { geometry=new THREE.BoxGeometry(.9,.9,.9); shape=new CANNON.Box(new CANNON.Vec3(.45,.45,.45)); }
-      const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness:.55,metalness:.12})); mesh.position.copy(position); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
-      const body=new CANNON.Body({mass:1.5,shape,position:new CANNON.Vec3(position.x,position.y,position.z),linearDamping:.25,angularDamping:.3}); world.addBody(body);
-      mesh.userData.body=body; bodies.push({mesh,body}); interactables.push(mesh);
-    }
-    function createPrimitives(){
-      const palette=[0xf35d6b,0x4dd0e1,0xfcc85d,0x8adb73,0xaf82ff];
-      for(let i=0;i<18;i++) addPrimitive(['box','sphere','cylinder'][i%3], new THREE.Vector3((Math.random()-.5)*16, 2+Math.random()*4, (Math.random()-.5)*16), palette[i%palette.length]);
-      document.getElementById('objectCount').textContent=interactables.length;
-    }
-    function loadExampleModel(){
-      const loader=new GLTFLoader();
-      loader.load('https://threejs.org/examples/models/gltf/Duck/glTF-Binary/Duck.glb', gltf=>{
-        const model=gltf.scene; model.position.set(-4,.35,-5); model.scale.setScalar(.02);
-        model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); scene.add(model);
-        document.getElementById('modelStatus').textContent='Duck.glb carregado'; hideLoading();
-      }, xhr=>{if(xhr.total)document.getElementById('loadingHint').textContent='Download: '+Math.round(xhr.loaded/xhr.total*100)+'%';}, ()=>{
-        document.getElementById('modelStatus').textContent='modelo externo indispon&iacute;vel; arena continua funcional'; hideLoading();
-      });
-    }
-    function hideLoading(){document.getElementById('loading').style.display='none';}
-    function grabOrThrow(){
-      if(held){
-        const d=new THREE.Vector3(); camera.getWorldDirection(d); held.body.velocity.set(d.x*config.throwForce,d.y*config.throwForce+.8,d.z*config.throwForce);
-        world.removeConstraint(heldConstraint); world.removeBody(heldAnchor); held.body.linearDamping=.25; held=null; heldAnchor=null; heldConstraint=null; return;
-      }
-      const d=new THREE.Vector3();camera.getWorldDirection(d);raycaster.set(camera.position,d);raycaster.far=config.grabDistance;
-      const hit=raycaster.intersectObjects(interactables,false)[0]; if(!hit)return;
-      const body=hit.object.userData.body; if(!body)return;
-      held={mesh:hit.object,body}; heldAnchor=new CANNON.Body({mass:0});world.addBody(heldAnchor);heldConstraint=new CANNON.PointToPointConstraint(body,new CANNON.Vec3(),heldAnchor,new CANNON.Vec3());world.addConstraint(heldConstraint);body.linearDamping=.9;
-    }
-    document.addEventListener('click',e=>{if(e.target.closest('#menu'))return;if(!controls.isLocked)controls.lock();else grabOrThrow();});
-    document.addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='Space'&&grounded){playerBody.velocity.y=config.jump;grounded=false;}});
-    document.addEventListener('keyup',e=>keys.delete(e.code));
-    function updatePlayer(){
-      if(!controls.isLocked)return; const forward=new THREE.Vector3(); camera.getWorldDirection(forward);forward.y=0;forward.normalize(); const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0));
-      const move=new THREE.Vector3(); if(keys.has('KeyW'))move.add(forward);if(keys.has('KeyS'))move.sub(forward);if(keys.has('KeyD'))move.add(right);if(keys.has('KeyA'))move.sub(right); if(move.lengthSq())move.normalize().multiplyScalar(keys.has('ShiftLeft')?config.run:config.walk);
-      playerBody.velocity.x=move.x;playerBody.velocity.z=move.z; camera.position.set(playerBody.position.x,playerBody.position.y+.55,playerBody.position.z);
-    }
-    function updateHeld(){if(!held)return;const d=new THREE.Vector3();camera.getWorldDirection(d);const p=camera.position.clone().add(d.multiplyScalar(2.25));heldAnchor.position.set(p.x,p.y,p.z);}
-    window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
-    createPlayer();createPrimitives();loadExampleModel();
-    renderer.setAnimationLoop(()=>{const dt=Math.min(clock.getDelta(),.05);grounded=false;world.step(1/60,dt,3);updatePlayer();updateHeld();for(const item of bodies){item.mesh.position.copy(item.body.position);item.mesh.quaternion.copy(item.body.quaternion);}renderer.render(scene,camera);});
+    import * as THREE from 'three'; import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; import * as CANNON from 'cannon-es';
+    const config={walk:5,run:9,jump:5.5,grabDistance:4,throwForce:13}; const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const scene=new THREE.Scene();scene.background=new THREE.Color(0x8bc9ef);scene.fog=new THREE.Fog(0x8bc9ef,28,95);const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,200);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);
+    const controls=new PointerLockControls(camera,document.body);scene.add(controls.getObject());const world=new CANNON.World();world.gravity.set(0,-9.82,0);world.broadphase=new CANNON.SAPBroadphase(world);const clock=new THREE.Clock(),raycaster=new THREE.Raycaster(),keys=new Set(),bodies=[],interactables=[];let playerBody,grounded=false,held=null,heldAnchor=null,heldConstraint=null,moveInput={x:0,y:0},isRunning=false;
+    scene.add(new THREE.HemisphereLight(0xffffff,0x48654b,2.2));const sun=new THREE.DirectionalLight(0xffffff,2.5);sun.position.set(20,30,15);sun.castShadow=true;scene.add(sun);const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x3f7844,roughness:.95}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);const floorBody=new CANNON.Body({mass:0,shape:new CANNON.Plane()});floorBody.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(floorBody);const grid=new THREE.GridHelper(100,50,0x4e9657,0x356b3d);grid.position.y=.01;scene.add(grid);
+    function createPlayer(){playerBody=new CANNON.Body({mass:70,shape:new CANNON.Sphere(.5),position:new CANNON.Vec3(0,1.4,8),linearDamping:.85,fixedRotation:true});playerBody.addEventListener('collide',e=>{if(e.contact.ni.y<-.45||e.contact.ni.y>.45)grounded=true});world.addBody(playerBody)}
+    function addPrimitive(type,position,color){let geometry,shape;if(type==='sphere'){geometry=new THREE.SphereGeometry(.45,20,14);shape=new CANNON.Sphere(.45)}else if(type==='cylinder'){geometry=new THREE.CylinderGeometry(.4,.4,1.1,16);shape=new CANNON.Cylinder(.4,.4,1.1,16)}else{geometry=new THREE.BoxGeometry(.9,.9,.9);shape=new CANNON.Box(new CANNON.Vec3(.45,.45,.45))}const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness:.55,metalness:.12}));mesh.position.copy(position);mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);const body=new CANNON.Body({mass:1.5,shape,position:new CANNON.Vec3(position.x,position.y,position.z),linearDamping:.25,angularDamping:.3});world.addBody(body);mesh.userData.body=body;bodies.push({mesh,body});interactables.push(mesh)}
+    function createPrimitives(){const palette=[0xf35d6b,0x4dd0e1,0xfcc85d,0x8adb73,0xaf82ff];for(let i=0;i<18;i++)addPrimitive(['box','sphere','cylinder'][i%3],new THREE.Vector3((Math.random()-.5)*16,2+Math.random()*4,(Math.random()-.5)*16),palette[i%palette.length]);document.getElementById('objectCount').textContent=interactables.length}
+    function hideLoading(){document.getElementById('loading').style.display='none'}function loadExampleModel(){new GLTFLoader().load('https://threejs.org/examples/models/gltf/Duck/glTF-Binary/Duck.glb',gltf=>{const model=gltf.scene;model.position.set(-4,.35,-5);model.scale.setScalar(.02);model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});scene.add(model);document.getElementById('modelStatus').textContent='Duck.glb carregado';hideLoading()},xhr=>{if(xhr.total)document.getElementById('loadingHint').textContent='Download: '+Math.round(xhr.loaded/xhr.total*100)+'%'},()=>{document.getElementById('modelStatus').textContent='modelo externo indispon&iacute;vel';hideLoading()})}
+    function grabOrThrow(){if(held){const d=new THREE.Vector3();camera.getWorldDirection(d);held.body.velocity.set(d.x*config.throwForce,d.y*config.throwForce+.8,d.z*config.throwForce);world.removeConstraint(heldConstraint);world.removeBody(heldAnchor);held.body.linearDamping=.25;held=heldAnchor=heldConstraint=null;return}const d=new THREE.Vector3();camera.getWorldDirection(d);raycaster.set(camera.position,d);raycaster.far=config.grabDistance;const hit=raycaster.intersectObjects(interactables,false)[0];if(!hit)return;const body=hit.object.userData.body;if(!body)return;held={mesh:hit.object,body};heldAnchor=new CANNON.Body({mass:0});world.addBody(heldAnchor);heldConstraint=new CANNON.PointToPointConstraint(body,new CANNON.Vec3(),heldAnchor,new CANNON.Vec3());world.addConstraint(heldConstraint);body.linearDamping=.9}
+    document.addEventListener('click',e=>{if(e.target.closest('#menu')||e.target.closest('#mobileControls'))return;if(!controls.isLocked)controls.lock();else grabOrThrow()});document.addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='Space'&&grounded){playerBody.velocity.y=config.jump;grounded=false}if(e.code==='ShiftLeft')isRunning=true;if(e.code==='KeyV')document.getElementById('voiceIndicator').style.display='block'});document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='ShiftLeft')isRunning=false;if(e.code==='KeyV')document.getElementById('voiceIndicator').style.display='none'});
+    const joystickZone=document.getElementById('joystickZone'),joystickStick=document.getElementById('joystickStick');let joystickCenter={x:0,y:0};joystickZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0],r=joystickZone.getBoundingClientRect();joystickCenter={x:r.left+r.width/2,y:r.top+r.height/2};updateJoystick(t)});joystickZone.addEventListener('touchmove',e=>{e.preventDefault();updateJoystick(e.changedTouches[0])});joystickZone.addEventListener('touchend',()=>{moveInput={x:0,y:0};joystickStick.style.transform='translate(-50%,-50%)'});function updateJoystick(t){const max=45;let dx=t.clientX-joystickCenter.x,dy=t.clientY-joystickCenter.y,d=Math.hypot(dx,dy);if(d>max){dx=dx/d*max;dy=dy/d*max}joystickStick.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';moveInput={x:dx/max,y:dy/max}}
+    document.getElementById('jumpBtn').addEventListener('touchstart',e=>{e.preventDefault();if(grounded){playerBody.velocity.y=config.jump;grounded=false}});document.getElementById('grabBtn').addEventListener('touchstart',e=>{e.preventDefault();grabOrThrow()});const fileInput=document.getElementById('fileInput');document.getElementById('uploadBtn').addEventListener('click',()=>fileInput.click());fileInput.addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const url=URL.createObjectURL(file);new GLTFLoader().load(url,gltf=>{const model=gltf.scene;model.position.set(playerBody.position.x+2,playerBody.position.y,playerBody.position.z+2);model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});scene.add(model);document.getElementById('modelStatus').textContent=file.name;URL.revokeObjectURL(url)},undefined,()=>alert('Erro ao carregar o modelo. Para arquivos .gltf, selecione também todos os arquivos de textura e bin&aacute;rios necess&aacute;rios.'))});
+    function updatePlayer(){if(!controls.isLocked&&!isMobile)return;const forward=new THREE.Vector3();camera.getWorldDirection(forward);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0));const move=new THREE.Vector3();if(isMobile){move.addScaledVector(right,moveInput.x);move.addScaledVector(forward,-moveInput.y)}else{if(keys.has('KeyW'))move.add(forward);if(keys.has('KeyS'))move.sub(forward);if(keys.has('KeyD'))move.add(right);if(keys.has('KeyA'))move.sub(right)}if(move.lengthSq())move.normalize().multiplyScalar(isRunning?config.run:config.walk);playerBody.velocity.x=move.x;playerBody.velocity.z=move.z;camera.position.set(playerBody.position.x,playerBody.position.y+.55,playerBody.position.z)}function updateHeld(){if(!held)return;const d=new THREE.Vector3();camera.getWorldDirection(d);const p=camera.position.clone().add(d.multiplyScalar(2.25));heldAnchor.position.set(p.x,p.y,p.z)}window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});createPlayer();createPrimitives();loadExampleModel();renderer.setAnimationLoop(()=>{const dt=Math.min(clock.getDelta(),.05);grounded=false;world.step(1/60,dt,3);updatePlayer();updateHeld();for(const item of bodies){item.mesh.position.copy(item.body.position);item.mesh.quaternion.copy(item.body.quaternion)}renderer.render(scene,camera)});
   </script>
 </body>
 </html>
