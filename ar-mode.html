@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Mode - Realidade Aumentada</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a2e, #16213e); display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; flex-direction: column; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.3); border-top: 5px solid #4CAF50; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px; font-size: 14px; z-index: 100; max-width: 400px; }
+        #ui h2 { color: #4CAF50; margin-bottom: 10px; font-size: 18px; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; margin: 5px 0; width: 100%; transition: transform 0.2s; }
+        .btn:hover { transform: scale(1.05); }
+        .btn:disabled { background: #666; cursor: not-allowed; transform: none; }
+        #ar-status { position: absolute; bottom: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; font-size: 13px; z-index: 100; }
+        #back-btn { position: absolute; top: 20px; right: 20px; background: #ff4444; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 100; }
+        .info-box { background: rgba(0,100,0,0.3); padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #4CAF50; }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px;">Inicializando AR...</p>
+        <p id="ar-check" style="margin-top: 10px; font-size: 12px; color: #aaa;">Verificando suporte WebXR...</p>
+    </div>
+
+    <div id="canvas-container">
+        <button id="back-btn" onclick="window.location.href='index.html'">&larr; Voltar</button>
+        <div id="ui">
+            <h2>&#128241; AR Mode</h2>
+            <p style="font-size: 12px; color: #aaa; margin-bottom: 15px;">Realidade Aumentada com WebXR</p>
+            <div id="ar-controls">
+                <button id="start-ar" class="btn" disabled>Iniciar AR</button>
+                <button id="spawn-object" class="btn" disabled>Colocar Objeto</button>
+                <button id="clear-objects" class="btn" disabled>Limpar</button>
+            </div>
+            <div class="info-box">
+                <strong>Status:</strong> <span id="status-text">Verificando...</span><br>
+                <strong>Objetos:</strong> <span id="object-count">0</span>
+            </div>
+        </div>
+        <div id="ar-status">
+            <div>&#128247; Camera: <span id="camera-status">Aguardando</span></div>
+            <div>&#127758; Tracking: <span id="tracking-status">Aguardando</span></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        let container, camera, scene, renderer, controller;
+        let reticle, reticleFound = false, objects = [], arSession = null;
+        const statusText = document.getElementById('status-text'), objectCountEl = document.getElementById('object-count');
+        const cameraStatusEl = document.getElementById('camera-status'), trackingStatusEl = document.getElementById('tracking-status');
+        const startArBtn = document.getElementById('start-ar'), spawnBtn = document.getElementById('spawn-object'), clearBtn = document.getElementById('clear-objects');
+
+        async function checkARSupport() {
+            const checkEl = document.getElementById('ar-check');
+            if ('xr' in navigator) {
+                try {
+                    const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                    if (supported) { checkEl.textContent = '✅ AR suportado!'; checkEl.style.color = '#4CAF50'; statusText.textContent = 'Pronto para iniciar'; startArBtn.disabled = false; }
+                    else { checkEl.textContent = '⚠️ AR não suportado'; checkEl.style.color = '#ff4444'; statusText.textContent = 'AR não disponível'; }
+                } catch (err) { checkEl.textContent = '❌ Erro ao verificar AR'; checkEl.style.color = '#ff4444'; statusText.textContent = 'Erro: ' + err.message; }
+            } else { checkEl.textContent = '❌ WebXR não suportado'; checkEl.style.color = '#ff4444'; statusText.textContent = 'Navegador não suporta WebXR'; }
+        }
+
+        function init() {
+            container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight); renderer.xr.enabled = true; renderer.setAnimationLoop(render);
+            container.appendChild(renderer.domElement);
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1); light.position.set(0.5, 1, 0.25); scene.add(light);
+            controller = renderer.xr.getController(0); controller.addEventListener('select', onSelect); scene.add(controller);
+            reticle = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x4CAF50 }));
+            reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+            window.addEventListener('resize', onWindowResize);
+            startArBtn.addEventListener('click', startAR); spawnBtn.addEventListener('click', spawnObject); clearBtn.addEventListener('click', clearObjects);
+            checkARSupport();
+            setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1000);
+            console.log('✅ AR Mode inicializado');
+        }
+
+        async function startAR() {
+            try {
+                const session = await navigator.xr.requestSession('immersive-ar', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] });
+                arSession = session; renderer.xr.setSession(session);
+                statusText.textContent = '🔴 AR Ativo'; cameraStatusEl.textContent = '✅ Ativa'; cameraStatusEl.style.color = '#4CAF50';
+                trackingStatusEl.textContent = '🟢 Rastreando'; trackingStatusEl.style.color = '#4CAF50';
+                spawnBtn.disabled = false; clearBtn.disabled = false; startArBtn.textContent = 'AR em execução...'; startArBtn.disabled = true;
+                session.addEventListener('end', onAREnd); console.log('📱 AR iniciado!');
+            } catch (err) { statusText.textContent = '❌ Erro: ' + err.message; console.error('Erro ao iniciar AR:', err); }
+        }
+
+        function onAREnd() {
+            statusText.textContent = 'AR finalizado'; cameraStatusEl.textContent = 'Aguardando'; cameraStatusEl.style.color = '#aaa';
+            trackingStatusEl.textContent = 'Aguardando'; trackingStatusEl.style.color = '#aaa';
+            spawnBtn.disabled = true; clearBtn.disabled = true; startArBtn.textContent = 'Iniciar AR'; startArBtn.disabled = false; arSession = null;
+        }
+
+        function onSelect() { if (reticleFound) spawnObject(); }
+
+        function spawnObject() {
+            if (!reticleFound) { statusText.textContent = '⚠️ Aponte para uma superfície'; return; }
+            const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff, roughness: 0.5, metalness: 0.3 });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.copy(reticle.position); cube.quaternion.copy(reticle.quaternion); cube.scale.set(1, 1, 1);
+            scene.add(cube); objects.push(cube); objectCountEl.textContent = objects.length; statusText.textContent = '✅ Objeto colocado'; console.log('📦 Objeto AR criado:', objects.length);
+        }
+
+        function clearObjects() { objects.forEach(obj => scene.remove(obj)); objects = []; objectCountEl.textContent = '0'; statusText.textContent = '🗑️ Objetos limpos'; }
+
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+
+        function render() {
+            if (arSession) {
+                reticle.visible = true; reticleFound = true;
+                const time = Date.now() * 0.001;
+                reticle.position.set(Math.sin(time) * 0.5, -0.5, Math.cos(time) * 0.5 - 1);
+                reticle.updateMatrix();
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
