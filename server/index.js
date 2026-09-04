@@ -1,30 +1,15 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
-const players = {};
-io.on('connection', (socket) => {
-    console.log('✅ Cliente conectado:', socket.id);
-    socket.on('join', (data) => {
-        console.log('👥 Jogador entrou:', data.name, data.id);
-        players[data.id] = { id: data.id, name: data.name, x: data.x || 0, y: data.y || 2, z: data.z || 0 };
-        io.emit('playerList', players);
-        socket.broadcast.emit('playerJoined', data);
-    });
-    socket.on('playerMove', (data) => {
-        if (players[data.id]) { players[data.id].x = data.x; players[data.id].y = data.y; players[data.id].z = data.z; }
-        socket.broadcast.emit('playerMove', data);
-    });
-    socket.on('disconnect', () => {
-        console.log('❌ Cliente desconectou:', socket.id);
-        for (const id in players) { if (players[id].id === socket.id) { delete players[id]; break; } }
-        io.emit('playerList', players);
-        io.emit('playerLeft', socket.id);
-    });
+import express from 'express';
+import cors from 'cors';
+import { createServer } from 'node:http';
+import { Server } from 'socket.io';
+const app=express(); app.use(cors());
+const http=createServer(app);
+const io=new Server(http,{cors:{origin:'*'}});
+app.get('/health',(_,res)=>res.json({ok:true,players:io.sockets.sockets.size}));
+io.on('connection',socket=>{
+  socket.on('player:join',data=>socket.broadcast.emit('player:joined',{id:socket.id,...data}));
+  socket.on('player:move',data=>socket.broadcast.emit('player:moved',{id:socket.id,...data}));
+  socket.on('voice:signal',data=>socket.broadcast.emit('voice:signal',{id:socket.id,...data}));
+  socket.on('disconnect',()=>socket.broadcast.emit('player:left',{id:socket.id}));
 });
-app.use(express.static(path.join(__dirname, '..')));
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => { console.log('🚀 Servidor rodando na porta', PORT); });
+http.listen(process.env.PORT||3000,()=>console.log('Arena multiplayer em execução'));
