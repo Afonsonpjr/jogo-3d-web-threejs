@@ -1,0 +1,32 @@
+schema_version = "1.0.0"
+
+id = "splatgen_standard"
+version = "5.1.0"
+name = "SplatGen Standard"
+tagline = "Build Gaussian Splat camera datasets in Blender"
+maintainer = "JELLY FISH STUDIO <shehabmekkyb010@gmail.com>"
+website = "https://discord.gg/NJ2wCsn8GG"
+copyright = [
+  "2026 shehab mekky",
+]
+type = "add-on"
+
+blender_version_min = "5.0.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[permissions]
+files = "Write rendered images and dataset files"
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "/*.zip",
+  "/icons/make_*.py",
+  "/MARKETPLACE_LISTING.md",
+  "/RELEASE_CHECKLIST.md",
+  "/RELEASE_NOTES.md",
+]
