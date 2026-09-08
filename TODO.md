@@ -19,27 +19,20 @@
   - `/home.html` → landing page
   - `/game.html` → jogo VR
   - `/ar.html` → sala AR
+- [x] **Limpeza da pasta `Materials/`** — 7 arquivos removidos:
+  - [x] `Art+Gallery+GLB.gltf` (24 MB)
+  - [x] `scene.gltf` (221 KB)
+  - [x] `untitled kamer 309 .gltf` (231 KB)
+  - [x] `CurtainsSet-01.obj` (52 MB)
+  - [x] `CurtainsSet-01.mtl` (706 bytes)
+  - [x] `CurtainsSet-01.fbx` (16 MB)
+  - [x] `CurtainsSet-01.mat` (61 KB)
+  - **Total liberado:** ~93 MB
 
 ## ⚠️ Pendentes (prioridade)
 
 ### 1. Modelos 3D e AR
 
-- [ ] Revisar e limpar pasta `Materials/`:
-  - [ ] Remover modelos quebrados/incompatíº½eis:
-    - `Materials/Art+Gallery+GLB.gltf`
-    - `Materials/scene.gltf`
-    - `Materials/untitled kamer 309 .gltf`
-    - `Materials/CurtainsSet-01.obj`
-    - `Materials/CurtainsSet-01.mtl`
-    - `Materials/CurtainsSet-01.fbx`
-    - `Materials/CurtainsSet-01.mat`
-  - [ ] Manter apenas:
-    - `Mini_modern_house.glb`
-    - `Mech by Quaternius - o3Ps8z8ByP.glb`
-    - `realistic+interior.glb`
-    - `appartement.glb`
-    - `McLaren_P1_GTR_2015.usdz`
-    - Texturas usadas por esses modelos.
 - [ ] Ajustar modelos principais no Blender:
   - [ ] Aplicar escala e roaçººo.
   - [ ] Colocar origem no chão (péºº do modelo em Y=0).
@@ -87,15 +80,7 @@
 
 ### 4. Deploy e Infra (Cloudflare / GitHub Pages)
 
-- [ ] Criar `DEPLOY-CLOUDFLARE.md`:
-  - [ ] Passo a passo via dashboard:
-    - Conectar repositóºººrio ao Cloudflare Pages.
-    - Branch `main`, preset `None`, build vazio, output `/`.
-  - [ ] Passo a passo via Wrangler CLI:
-    - Instalar Wrangler.
-    - Login.
-    - Criar `wrangler.toml`.
-    - Comando `wrangler pages deploy`.
+- [x] Criar `DEPLOY-CLOUDFLARE.md`.
 - [ ] Testar deploy no Cloudflare Pages:
   - [ ] Validar URLs:
     - `https://<projeto>.pages.dev/` → redirect para `/home.html`
@@ -121,11 +106,11 @@
 
 ## 🧭 Pró º º ºximos passos sugeridos
 
-1. Limpar pasta `Materials/` e deixar só modelos válidos.
+1. ✅ Limpeza concluíººa — pasta `Materials/` otimizada.
 2. Ajustar 2–3 modelos no Blender e exportar GLB/USDZ otimizados.
 3. Atualizar `ar.html` com esses modelos e `ios-src`.
 4. Implementar física básica e controles mobile melhores em `game.html`.
-5. Criar `DEPLOY-CLOUDFLARE.md` e subir o projeto no Cloudflare Pages.
+5. Fazer deploy no Cloudflare Pages (seguir `DEPLOY-CLOUDFLARE.md`).
 6. Testar tudo em:
    - Android (Chrome) → AR via WebXR/Scene Viewer.
    - iOS (Safari) → AR via Quick Look (USDZ).
