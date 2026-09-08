@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seila — Sala AR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <style>
+    :root { --bg:#0b0f14;--card:#121821;--text:#e6edf3;--muted:#9aa4b2;--accent:#60a5fa; }
+    * { box-sizing:border-box;margin:0;padding:0; }
+    body { font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(1200px 800px at 20% -10%,#1b2735,#090a0f 60%);color:var(--text);min-height:100vh;display:flex;flex-direction:column; }
+    header { padding:24px 18px 10px;text-align:center; }
+    h1 { font-size:clamp(22px,4vw,32px);font-weight:800;letter-spacing:-0.4px;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),#34d399);-webkit-background-clip:text;background-clip:text;color:transparent; }
+    p.subtitle { color:var(--muted);font-size:clamp(13px,2.4vw,16px);max-width:640px;margin:0 auto; }
+    .layout { display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;flex:1; }
+    .models { background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:calc(100vh - 140px); }
+    .model-btn { display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);color:var(--text);cursor:pointer;transition:background 0.15s ease,border-color 0.15s ease,transform 0.12s ease;text-align:left; }
+    .model-btn:hover { background:rgba(255,255,255,0.06);border-color:rgba(96,165,250,0.35);transform:translateX(2px); }
+    .model-name { font-size:14px;font-weight:600; }
+    .model-meta { font-size:12px;color:var(--muted); }
+    .viewer { background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:12px;display:flex;flex-direction:column; }
+    model-viewer { width:100%;height:calc(100vh - 160px);background:radial-gradient(800px 500px at 50% 0%,#0f1520,#070a10 70%);border-radius:10px;--poster-color:transparent; }
+    .viewer-info { margin-top:10px;font-size:13px;color:var(--muted);line-height:1.35; }
+    @media (max-width:900px) { .layout { grid-template-columns:1fr; } .models { max-height:220px; } model-viewer { height:50vh; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sala AR</h1>
+    <p class="subtitle">Escolha um modelo, visualize em 3D e abra em AR nativo (Android) ou Quick Look (iOS com USDZ).</p>
+  </header>
+  <div class="layout">
+    <div class="models" id="modelsList"></div>
+    <div class="viewer">
+      <model-viewer id="mainViewer" src="" ios-src="" ar ar-modes="webxr scene-viewer quick-look fallback" camera-controls auto-rotate shadow-intensity="1" exposure="1" alt="Visualizador 3D em AR"></model-viewer>
+      <div class="viewer-info">Dica: no celular, toque no ícone de AR que aparece no viewer para abrir no seu espaço.</div>
+    </div>
+  </div>
+  <script>
+    const models = [
+      { name:"Casa Moderna", src:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/Mini_modern_house.glb", iosSrc:"", meta:"GLB — Android AR, Desktop 3D" },
+      { name:"Interior Realista", src:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/realistic+interior.glb", iosSrc:"", meta:"GLB — Android AR, Desktop 3D" },
+      { name:"Apartamento", src:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/appartement.glb", iosSrc:"", meta:"GLB — Android AR, Desktop 3D" },
+      { name:"Mech (Quaternius)", src:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/Mech%20by%20Quaternius%20-%20o3Ps8z8ByP.glb", iosSrc:"", meta:"GLB — Android AR, Desktop 3D" },
+      { name:"McLaren P1 GTR", src:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/McLaren_P1_GTR_2015.usdz", iosSrc:"https://github.com/Afonsonpjr/jogo-3d-web-threejs/raw/main/Materials/McLaren_P1_GTR_2015.usdz", meta:"USDZ — iOS Quick Look + Desktop 3D" }
+    ];
+    const listEl = document.getElementById('modelsList');
+    const viewer = document.getElementById('mainViewer');
+    function loadModel(m) {
+      viewer.src = m.src;
+      if (m.iosSrc) viewer.setAttribute('ios-src', m.iosSrc);
+      else viewer.removeAttribute('ios-src');
+    }
+    models.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'model-btn';
+      btn.innerHTML = '<div class="model-name">'+m.name+'</div><div class="model-meta">'+m.meta+'</div>';
+      btn.addEventListener('click', () => loadModel(m));
+      listEl.appendChild(btn);
+      if (idx === 0) loadModel(m);
+    });
+  </script>
+</body>
+</html>

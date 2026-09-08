@@ -1,21 +1,96 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><title>Arena 3D</title><style>*{box-sizing:border-box;touch-action:none}body{margin:0;overflow:hidden;background:#06111f;color:#fff;font:14px system-ui,sans-serif}canvas{display:block}.hud{position:fixed;z-index:3;pointer-events:none}.card{background:#071425b8;border:1px solid #7dd3fc55;border-radius:12px;padding:10px 12px;backdrop-filter:blur(8px)}#top{top:max(10px,env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;gap:8px}#stats{min-width:160px}#bar{height:8px;border-radius:9px;background:#3e1520;margin-top:6px;overflow:hidden}#hp{height:100%;width:100%;background:linear-gradient(90deg,#fb4b62,#ffaf72)}#notice{top:76px;left:50%;transform:translateX(-50%);text-align:center;max-width:min(92vw,560px)}#inventory{bottom:max(12px,env(safe-area-inset-bottom));left:12px;display:flex;gap:7px}.slot{min-width:44px;text-align:center}.slot b{display:block;font-size:18px}button{font:inherit;color:#fff;background:#123354cc;border:1px solid #8ad5ff88;border-radius:10px;padding:8px;cursor:pointer;pointer-events:auto}#file{display:none}#mobile{display:none;position:fixed;inset:0;z-index:4;pointer-events:none}#stickZone{position:absolute;left:22px;bottom:max(24px,env(safe-area-inset-bottom));width:142px;height:142px;pointer-events:auto}.stickBase{width:100%;height:100%;border-radius:50%;background:#dff6ff2b;border:2px solid #dff6ff45}.stick{position:absolute;width:58px;height:58px;left:42px;top:42px;border-radius:50%;background:#48b9e6bb;border:2px solid #dff6ff99}.actions{position:absolute;right:22px;bottom:max(30px,env(safe-area-inset-bottom));display:grid;grid-template-columns:70px 70px;gap:12px;pointer-events:auto}.act{width:70px;height:70px;border-radius:50%;font-size:23px}.act.small{width:52px;height:52px;justify-self:end}@media(max-width:768px),(pointer:coarse){#mobile{display:block}#notice{top:64px;font-size:12px}#inventory{bottom:174px}.card{padding:8px 10px;font-size:12px}}
-</style></head><body>
-<div id="top" class="hud"><div id="stats" class="card"><b>ARENA 3D</b><div id="bar"><div id="hp"></div></div><small>Vida: <span id="hpText">100</span> &middot; Pontos: <span id="score">0</span></small></div><div class="card"><button id="upload">📤 Modelo</button><input id="file" type="file" accept=".glb,.gltf" multiple></div></div><div id="notice" class="hud card">PC: WASD move &middot; Shift corre &middot; Espa&ccedil;o pula &middot; clique pega/arremessa &middot; <b>segure V para falar</b><br>Celular: anal&oacute;gico esquerdo; arraste o lado direito para olhar.</div><div id="inventory" class="hud"><div class="card slot"><b>📦</b><span id="boxes">0</span></div><div class="card slot"><b>⭐</b><span id="stars">0</span></div></div>
-<div id="mobile"><div id="stickZone"><div class="stickBase"></div><div id="stick" class="stick"></div></div><div class="actions"><button id="jump" class="act">⬆</button><button id="grab" class="act">✋</button><button id="run" class="act small">⚡</button></div></div>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/","cannon-es":"https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"}}</script><script type="module">
-import*as THREE from'three';import{GLTFLoader}from'three/addons/loaders/GLTFLoader.js';import*as CANNON from'cannon-es';
-const mobile=matchMedia('(pointer:coarse)').matches,scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,180),renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.append(renderer.domElement);scene.background=new THREE.Color(0x72b9e6);scene.fog=new THREE.Fog(0x72b9e6,35,115);
-const world=new CANNON.World();world.gravity.set(0,-9.82,0);world.broadphase=new CANNON.SAPBroadphase(world);const clock=new THREE.Clock(),keys=new Set(),ray=new THREE.Raycaster(),items=[],bodies=[];let player,ground=false,held,anchor,joint,move={x:0,y:0},running=false,yaw=0,pitch=0,score=0,boxCount=0,stars=0;
-scene.add(new THREE.HemisphereLight(0xc9efff,0x24452b,2.2));const sun=new THREE.DirectionalLight(0xfff2d3,2.8);sun.position.set(20,35,15);sun.castShadow=true;scene.add(sun);const floor=new THREE.Mesh(new THREE.CircleGeometry(55,64),new THREE.MeshStandardMaterial({color:0x397943,roughness:.9}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);const fb=new CANNON.Body({mass:0,shape:new CANNON.Plane()});fb.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(fb);
-const sky=new THREE.Mesh(new THREE.SphereGeometry(150,32,16),new THREE.MeshBasicMaterial({color:0x75bee9,side:THREE.BackSide}));scene.add(sky);const starGeo=new THREE.BufferGeometry(),p=[];for(let i=0;i<700;i++)p.push((Math.random()-.5)*130,8+Math.random()*75,(Math.random()-.5)*130);starGeo.setAttribute('position',new THREE.Float32BufferAttribute(p,3));const particles=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xfff6b0,size:.3,transparent:true,opacity:.75}));scene.add(particles);
-function sound(f,d=.07,type='sine'){try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.05,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);o.connect(g).connect(c.destination);o.start();o.stop(c.currentTime+d)}catch{}}
-function add(type,pos,color){const g=type===1?new THREE.SphereGeometry(.48,18,12):new THREE.BoxGeometry(.9,.9,.9),shape=type===1?new CANNON.Sphere(.48):new CANNON.Box(new CANNON.Vec3(.45,.45,.45)),m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:.45,metalness:.15}));m.position.copy(pos);m.castShadow=m.receiveShadow=true;scene.add(m);const b=new CANNON.Body({mass:1.5,shape,position:new CANNON.Vec3(pos.x,pos.y,pos.z),linearDamping:.2});b.addEventListener('collide',e=>{if(e.contact.getImpactVelocityAlongNormal()<-4)sound(110,.05,'square')});world.addBody(b);m.userData.body=b;items.push(m);bodies.push({m,b})}for(let i=0;i<24;i++)add(i%2,new THREE.Vector3((Math.random()-.5)*22,2+Math.random()*8,(Math.random()-.5)*22),[0xfb7185,0x38bdf8,0xfacc15,0xa78bfa][i%4]);document.querySelector('#boxes').textContent=items.length;
-player=new CANNON.Body({mass:70,shape:new CANNON.Sphere(.5),position:new CANNON.Vec3(0,1.5,8),linearDamping:.86,fixedRotation:true});player.addEventListener('collide',()=>ground=true);world.addBody(player);
-function grab(){if(held){const d=new THREE.Vector3();camera.getWorldDirection(d);held.body.velocity.set(d.x*13,d.y*13+1,d.z*13);world.removeConstraint(joint);world.removeBody(anchor);held.body.linearDamping=.2;held=anchor=joint=null;sound(180,.12,'sawtooth');return}const d=new THREE.Vector3();camera.getWorldDirection(d);ray.set(camera.position,d);ray.far=4;const h=ray.intersectObjects(items)[0];if(!h)return;held={m:h.object,body:h.object.userData.body};anchor=new CANNON.Body({mass:0});world.addBody(anchor);joint=new CANNON.PointToPointConstraint(held.body,new CANNON.Vec3(),anchor,new CANNON.Vec3());world.addConstraint(joint);held.body.linearDamping=.9;sound(540,.08);score+=5;boxCount++;document.querySelector('#score').textContent=score;document.querySelector('#boxes').textContent=boxCount}
-function jump(){if(ground){player.velocity.y=5.6;ground=false;sound(260,.06)}}
-addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='Space')jump();if(e.code==='ShiftLeft')running=true;if(e.code==='KeyV')document.querySelector('#notice').style.borderColor='#f87171'});addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='ShiftLeft')running=false;if(e.code==='KeyV')document.querySelector('#notice').style.borderColor='' });renderer.domElement.addEventListener('click',()=>{if(!mobile)grab()});
-let lookTouch;renderer.domElement.addEventListener('pointerdown',e=>{if(mobile&&e.clientX>innerWidth*.45)lookTouch={x:e.clientX,y:e.clientY}});renderer.domElement.addEventListener('pointermove',e=>{if(lookTouch){yaw-=(e.clientX-lookTouch.x)*.006;pitch=Math.max(-1.3,Math.min(1.3,pitch-(e.clientY-lookTouch.y)*.006));lookTouch={x:e.clientX,y:e.clientY}}});renderer.domElement.addEventListener('pointerup',()=>lookTouch=null);
-const zone=document.querySelector('#stickZone'),stick=document.querySelector('#stick');function stickMove(t){const r=zone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let x=t.clientX-cx,y=t.clientY-cy,l=Math.hypot(x,y),m=43;if(l>m){x=x/l*m;y=y/l*m}move={x:x/m,y:y/m};stick.style.transform=`translate(${x}px,${y}px)`}zone.addEventListener('pointerdown',e=>{zone.setPointerCapture(e.pointerId);stickMove(e)});zone.addEventListener('pointermove',e=>{if(e.buttons)stickMove(e)});zone.addEventListener('pointerup',()=>{move={x:0,y:0};stick.style.transform='translate(0,0)'});document.querySelector('#jump').onclick=jump;document.querySelector('#grab').onclick=grab;document.querySelector('#run').onpointerdown=()=>running=true;document.querySelector('#run').onpointerup=()=>running=false;
-const input=document.querySelector('#file');document.querySelector('#upload').onclick=()=>input.click();input.onchange=()=>{const file=[...input.files].find(f=>/\.glb$/i.test(f.name));if(!file)return alert('Selecione um arquivo .glb. Arquivos .gltf dependem de bin&aacute;rios e texturas associados.');const u=URL.createObjectURL(file);new GLTFLoader().load(u,g=>{g.scene.position.set(player.position.x+2,player.position.y,player.position.z);g.scene.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true}});scene.add(g.scene);URL.revokeObjectURL(u);score+=20;document.querySelector('#score').textContent=score},undefined,()=>alert('N&atilde;o foi poss&iacute;vel abrir o modelo.'))};
-function frame(){const dt=Math.min(clock.getDelta(),.05);ground=false;world.step(1/60,dt,3);particles.rotation.y+=dt*.01;const f=new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw)),r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)),v=new THREE.Vector3();if(mobile){v.addScaledVector(r,move.x).addScaledVector(f,-move.y)}else{if(keys.has('KeyW'))v.add(f);if(keys.has('KeyS'))v.sub(f);if(keys.has('KeyD'))v.add(r);if(keys.has('KeyA'))v.sub(r)}if(v.lengthSq())v.normalize().multiplyScalar(running?9:5);player.velocity.x=v.x;player.velocity.z=v.z;camera.position.set(player.position.x,player.position.y+.55,player.position.z);camera.rotation.set(pitch,yaw,0,'YXZ');if(held){const d=new THREE.Vector3();camera.getWorldDirection(d);const q=camera.position.clone().addScaledVector(d,2.25);anchor.position.set(q.x,q.y,q.z)}for(const x of bodies){x.m.position.copy(x.b.position);x.m.quaternion.copy(x.b.quaternion)}renderer.render(scene,camera)}renderer.setAnimationLoop(frame);addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seila — Game (VR)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <style>
+    html, body { margin:0;padding:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    #info { position:absolute;left:12px;bottom:12px;color:#e6edf3;font-size:12px;background:rgba(0,0,0,0.55);padding:8px 10px;border-radius:8px;pointer-events:none;user-select:none;max-width:260px;line-height:1.35;z-index:10; }
+    #vr-hint { position:absolute;right:12px;bottom:12px;color:#e6edf3;font-size:12px;background:rgba(0,0,0,0.55);padding:8px 10px;border-radius:8px;pointer-events:none;user-select:none;z-index:10; }
+  </style>
+</head>
+<body>
+  <div id="info">PC: WASD + Shift (correr) + Espaço (pulo) + Clique (interagir) + V (push-to-talk)<br>Mobile: analogue virtual + botones (pulo, agarrar, correr)<br>VR: clique no botão "Enter VR" quando aparecer.</div>
+  <div id="vr-hint">VR via WebXR (headsets compat).</div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { VRButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/VRButton.js';
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x05070a);
+    scene.fog = new THREE.Fog(0x05070a, 10, 60);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 1.6, 4);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+    document.body.appendChild(VRButton.createButton(renderer));
+    const hemi = new THREE.HemisphereLight(0x88ccff, 0x223344, 0.8);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(5, 10, 7);
+    dir.castShadow = true;
+    scene.add(dir);
+    const floorGeo = new THREE.PlaneGeometry(60, 60);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1f29 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa });
+    for (let i = 0; i < 12; i++) {
+      const box = new THREE.Mesh(boxGeo, boxMat);
+      box.position.set((Math.random() - 0.5) * 20, 0.5, (Math.random() - 0.5) * 20);
+      box.castShadow = true;
+      box.receiveShadow = true;
+      scene.add(box);
+    }
+    const keys = { w:false, a:false, s:false, d:false, shift:false, space:false, v:false };
+    const moveState = { forward:0, right:0, up:0, run:false, pushToTalk:false };
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyW') keys.w = true;
+      if (e.code === 'KeyA') keys.a = true;
+      if (e.code === 'KeyS') keys.s = true;
+      if (e.code === 'KeyD') keys.d = true;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
+      if (e.code === 'Space') keys.space = true;
+      if (e.code === 'KeyV') { keys.v = true; moveState.pushToTalk = true; }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW') keys.w = false;
+      if (e.code === 'KeyA') keys.a = false;
+      if (e.code === 'KeyS') keys.s = false;
+      if (e.code === 'KeyD') keys.d = false;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
+      if (e.code === 'Space') keys.space = false;
+      if (e.code === 'KeyV') { keys.v = false; moveState.pushToTalk = false; }
+    });
+    renderer.setAnimationLoop(() => {
+      moveState.forward = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
+      moveState.right = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+      moveState.run = !!keys.shift;
+      moveState.up = keys.space ? 1 : 0;
+      const speed = moveState.run ? 0.12 : 0.06;
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      direction.y = 0;
+      direction.normalize();
+      const right = new THREE.Vector3();
+      right.crossVectors(camera.up, direction).normalize();
+      if (moveState.forward !== 0) camera.position.addScaledVector(direction, moveState.forward * speed);
+      if (moveState.right !== 0) camera.position.addScaledVector(right, -moveState.right * speed);
+      if (moveState.up !== 0) camera.position.y += 0.08;
+      renderer.render(scene, camera);
+    });
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
