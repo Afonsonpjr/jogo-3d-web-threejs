@@ -10,7 +10,7 @@ Jogos 3D, Realidade Aumentada (AR) e Virtual (VR) rodando na Cloudflare Pages.
 
 | Página | Descrição | Tecnologia |
 |--------|------------|------------|
-| [Game 3D](public/game.html) | Cubo 3D girató···rio | Three.js |
+| [Game 3D](public/game.html) | Cubo 3D girat�rio | Three.js |
 | [AR](public/ar.html) | Astronauta em AR | model-viewer |
 | [AR Viewer](public/ar-viewer.html) | Tê··nis 3D AR | model-viewer |
 | [AR Mode](public/ar-mode.html) | Cadeira 3D AR | model-viewer |
