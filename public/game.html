@@ -7,42 +7,44 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-      background: #1a1a2e; 
-      color: #fff; 
-      min-height: 100vh; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      justify-content: center; 
-      text-align: center;
-      padding: 1rem;
-    }
-    .container { max-width: 600px; width: 100%; }
-    h1 { font-size: clamp(2rem, 6vw, 3rem); margin-bottom: 1rem; }
-    p { color: #aaa; margin-bottom: 2rem; font-size: 1rem; }
-    a { 
-      color: #667eea; 
-      text-decoration: none; 
-      padding: 0.75rem 1.5rem;
-      border: 2px solid #667eea;
-      border-radius: 10px;
-      display: inline-block;
-      min-height: 48px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, color 0.2s;
-    }
-    a:hover { background: #667eea; color: #fff; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #fff; overflow: hidden; }
+    #canvas-container { width: 100vw; height: 100vh; display: block; }
+    .ui-overlay { position: absolute; top: 1rem; left: 1rem; z-index: 100; }
+    .back-btn { color: #667eea; text-decoration: none; padding: 0.75rem 1.5rem; border: 2px solid #667eea; border-radius: 10px; background: rgba(0,0,0,0.5); min-height: 48px; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .back-btn:hover { background: #667eea; color: #fff; }
+    .info { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 1rem 2rem; border-radius: 10px; text-align: center; font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🎮 Jogo 3D</h1>
-    <p>Em desenvolvimento...</p>
-    <p><a href="home.html">← Voltar</a></p>
-  </div>
+  <div id="canvas-container"></div>
+  <div class="ui-overlay"><a href="home.html" class="back-btn">← Voltar</a></div>
+  <div class="info">🎮 Jogo 3D - Three.js<br><small>Cubo girat�rio</small></div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 5;
+    const renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshNormalMaterial();
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    function animate() {
+      requestAnimationFrame(animate);
+      cube.rotation.x += 0.01;
+      cube.rotation.y += 0.01;
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
 </body>
 </html>
