@@ -7,42 +7,26 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-      background: #1a1a2e; 
-      color: #fff; 
-      min-height: 100vh; 
-      display: flex; 
-      flex-direction: column; 
-      align-items: center; 
-      justify-content: center; 
-      text-align: center;
-      padding: 1rem;
-    }
-    .container { max-width: 600px; width: 100%; }
+    body { font-family: system-ui; background: #1a1a2e; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1rem; }
+    .container { max-width: 600px; }
     h1 { font-size: clamp(2rem, 6vw, 3rem); margin-bottom: 1rem; }
-    p { color: #aaa; margin-bottom: 2rem; font-size: 1rem; }
-    a { 
-      color: #667eea; 
-      text-decoration: none; 
-      padding: 0.75rem 1.5rem;
-      border: 2px solid #667eea;
-      border-radius: 10px;
-      display: inline-block;
-      min-height: 48px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, color 0.2s;
-    }
-    a:hover { background: #667eea; color: #fff; }
+    p { color: #aaa; margin: 1rem 0 2rem; line-height: 1.6; }
+    .features { display: grid; gap: 1rem; margin: 2rem 0; }
+    .feature { background: rgba(102,126,234,0.1); padding: 1rem; border-radius: 10px; border-left: 3px solid #667eea; text-align: left; }
+    .back-btn { color: #667eea; background: rgba(0,0,0,0.5); padding: 0.75rem 1.5rem; border: 2px solid #667eea; border-radius: 10px; text-decoration: none; display: inline-block; min-height: 48px; margin-top: 2rem; }
+    .back-btn:hover { background: #667eea; color: #fff; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🌐 Multiplayer</h1>
-    <p>Em desenvolvimento...</p>
-    <p><a href="home.html">← Voltar</a></p>
+    <p>Jogue com amigos em tempo real!<br><em>Em desenvolvimento...</em></p>
+    <div class="features">
+      <div class="feature">🎮 Salas privadas</div>
+      <div class="feature">⚡ WebSocket em tempo real</div>
+      <div class="feature">👥 Até 8 jogadores</div>
+    </div>
+    <p><a href="home.html" class="back-btn">← Voltar</a></p>
   </div>
 </body>
 </html>
