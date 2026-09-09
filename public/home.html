@@ -7,57 +7,32 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-      min-height: 100vh; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      padding: 1rem;
-    }
-    .container { 
-      background: rgba(255,255,255,0.95); 
-      padding: 2rem; 
-      border-radius: 20px; 
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
-      text-align: center; 
-      max-width: 500px;
-      width: 100%;
-    }
+    body { font-family: system-ui; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .container { background: rgba(255,255,255,0.95); padding: 2rem; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; max-width: 500px; width: 100%; }
     h1 { font-size: clamp(1.8rem, 5vw, 2.5rem); margin-bottom: 0.5rem; color: #333; }
-    p { color: #666; margin-bottom: 2rem; font-size: 1rem; }
-    .links { display: flex; flex-direction: column; gap: 0.75rem; }
-    a { 
-      display: block; 
-      padding: 1rem 1.5rem; 
-      background: #667eea; 
-      color: white; 
-      text-decoration: none; 
-      border-radius: 12px; 
-      transition: transform 0.2s, background 0.2s;
-      font-size: 1rem;
-      min-height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .subtitle { color: #666; margin-bottom: 2rem; font-size: 1rem; }
+    .links { display: grid; gap: 0.75rem; }
+    a { display: block; padding: 1rem 1.5rem; background: #667eea; color: #fff; text-decoration: none; border-radius: 12px; transition: 0.2s; font-size: 1rem; min-height: 48px; display: flex; align-items: center; justify-content: center; }
     a:hover { transform: translateY(-2px); background: #764ba2; }
-    a:active { transform: translateY(0); }
-    @media (max-width: 480px) {
-      .container { padding: 1.5rem; }
-      a { padding: 0.875rem 1.25rem; }
-    }
+    .ar-group { margin-top: 1.5rem; }
+    .ar-group h3 { color: #333; margin-bottom: 0.75rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎮 Seila</h1>
-    <p>3D, AR e VR</p>
+    <p class="subtitle">3D, AR e VR</p>
     <div class="links">
       <a href="game.html">🎯 Jogo 3D</a>
       <a href="ar.html">📱 Realidade Aumentada</a>
       <a href="multiplayer.html">🌐 Multiplayer</a>
+    </div>
+    <div class="ar-group">
+      <h3>Experiê··ncias AR</h3>
+      <div class="links">
+        <a href="ar-viewer.html">👟 AR Viewer (Tê··nis)</a>
+        <a href="ar-mode.html">🪑 AR Mode (Cadeira)</a>
+      </div>
     </div>
   </div>
 </body>
