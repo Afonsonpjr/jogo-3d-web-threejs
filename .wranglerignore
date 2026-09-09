@@ -1,0 +1,17 @@
+.git
+.gitignore
+wrangler.jsonc
+node_modules
+server
+server.py
+Materials/source
+Materials/docs
+Materials/building_data
+Materials/splat_manager
+Materials/Textures
+Materials/*.usdz
+CLOUDFLARE-REPORT.md
+DEPLOY-CLOUDFLARE.md
+TODO.md
+README.md
+.nojekyll
